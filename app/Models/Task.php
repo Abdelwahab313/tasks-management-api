@@ -30,4 +30,19 @@ class Task extends Model
         ];
     }
 
+
+    public function scopeFilterByStatus($query, $status)
+    {
+        return $query->when($status, function ($query, $status) {
+            return $query->where('status', $status);
+        });
+    }
+
+    public function scopeFilterByDueDate($query, $dueDate)
+    {
+        return $query->when($dueDate, function ($query, $dueDate) {
+            return $query->whereDate('due_date', $dueDate);
+        });
+    }
+
 }
