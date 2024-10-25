@@ -3,12 +3,8 @@ IS_RUNNING := $(shell docker inspect task-api-app 2>/dev/null | grep "Running" |
 RUNNING := Running: true
 $(if $(IS_RUNNING), $(info ### Task API container ${IS_RUNNING} ###), $(info ### Task API container Running: false ###))
 
-# Export user ID for docker
-.EXPORT_ALL_VARIABLES:
-UID := $(shell id -u)
-
 # Main setup command
-setup: build up install
+setup: build up migrate install
 
 # Docker commands
 build:

@@ -1,7 +1,7 @@
-# Dockerfile
+
 FROM php:8.2-fpm
 
-# Install system dependencies
+# Install system dependencies and PHP extensions in a single layer
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -9,28 +9,44 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     zip \
-    unzip
+    unzip \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd \
+    && pecl install xdebug \
+    && docker-php-ext-enable xdebug \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install composer with specific version and optimize it
+COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+# Set composer environment variables
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/composer \
+    COMPOSER_CACHE_DIR=/composer/cache
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Create composer cache directory and set permissions
+RUN mkdir -p /composer/cache \
+    && chmod -R 777 /composer
 
 # Set working directory
-WORKDIR /var/www
+WORKDIR /var/www/html
 
-# Copy existing application directory
+# Copy composer files first
+COPY composer.json composer.lock ./
+
+# Install dependencies (with optimizations)
+RUN composer install --no-scripts --no-autoloader --no-dev
+
+# Copy the rest of the application
 COPY . .
 
-# Install dependencies
-RUN composer install
+# Generate optimized autoload files
+RUN composer dump-autoload --optimize --classmap-authoritative
 
-# Change ownership of our applications
-RUN chown -R www-data:www-data /var/www
+# Set correct permissions
+RUN chown -R www-data:www-data /var/www/html
+
 
 # Expose port 9000 and start php-fpm server
 EXPOSE 9000
