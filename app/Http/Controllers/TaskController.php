@@ -2,39 +2,47 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\TaskResource;
+use App\Http\Requests\CreateTaskRequest;
+use App\Http\Requests\ListTasksRequest;
+use App\Http\Requests\ShowTaskRequest;
 use App\Models\Task;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\JsonResponse;
 
 class TaskController extends Controller
 {
-    public function index(Request $request)
+    public function index(ListTasksRequest $request): JsonResponse
     {
-        $tasks = Task::filterByStatus($request->status)
-            ->filterByDueDate($request->due_date)
-            ->orderBy('due_date')
-            ->paginate(10);
+        $query = Task::query();
 
-        return TaskResource::collection($tasks);
-    }
-
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|max:255',
-            'description' => 'nullable',
-            'status' => 'required|in:pending,in_progress,completed',
-            'due_date' => 'required|date|after:today',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
         }
 
-        $task = Task::create($validator->validated());
+        if ($request->has('due_date')) {
+            $query->whereDate('due_date', $request->due_date);
+        }
 
-        return new TaskResource($task);
+        if ($request->has('title')) {
+            $query->where('title', 'like', "%{$request->title}%");
+        }
+
+        $tasks = $query->orderBy('due_date')->paginate();
+
+        return response()->json(['data' => $tasks]);
+    }
+
+    public function store(CreateTaskRequest $request): JsonResponse
+    {
+        $task = Task::create($request->validated());
+
+        return response()->json(['data' => $task], 201);
+    }
+
+    public function show(ShowTaskRequest $request): JsonResponse
+    {
+        $task = Task::findOrFail($request->id);
+
+        return response()->json(['data' => $task]);
     }
 
 }
