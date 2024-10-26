@@ -3,33 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateTaskRequest;
+use App\Http\Requests\DeleteTaskRequest;
 use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\ShowTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Resources\TaskResource;
-use App\Models\Task;
+use App\Services\TaskService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class TaskController extends Controller
 {
+    public function __construct(
+        private readonly TaskService $taskService
+    ) {}
+
     public function index(ListTasksRequest $request): JsonResponse
     {
-        $query = Task::query();
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->has('due_date')) {
-            $query->whereDate('due_date', $request->due_date);
-        }
-
-        if ($request->has('title')) {
-            $query->where('title', 'like', "%{$request->title}%");
-        }
-
-        $tasks = $query->orderBy('due_date')->paginate($request->per_page ?? 10);
+        $tasks = $this->taskService->getTasks($request->validated());
 
         return response()->json([
             'data' => TaskResource::collection($tasks),
@@ -44,15 +36,18 @@ class TaskController extends Controller
 
     public function store(CreateTaskRequest $request): JsonResponse
     {
-        $task = Task::create($request->validated());
+        $task = $this->taskService->createTask($request->validated());
 
-        return response()->json(['data' => new TaskResource($task)], Response::HTTP_CREATED);
+        return response()->json([
+            'data' => new TaskResource($task)
+        ], Response::HTTP_CREATED);
     }
 
     public function show(ShowTaskRequest $request): JsonResponse
     {
+
         try {
-            $task = Task::findOrFail($request->id);
+            $task = $this->taskService->getTask($request->validated('id'));
 
             return response()->json([
                 'data' => new TaskResource($task)
@@ -63,6 +58,27 @@ class TaskController extends Controller
                 'error' => 'Task not found'
             ], Response::HTTP_NOT_FOUND);
         }
+    }
+
+    public function update(UpdateTaskRequest $request): JsonResponse
+    {
+        $task = $this->taskService->updateTask(
+            $request->validated('id'),
+            $request->validated()
+        );
+
+        return response()->json([
+            'data' => new TaskResource($task)
+        ]);
+    }
+
+    public function destroy(DeleteTaskRequest $request): JsonResponse
+    {
+        $this->taskService->deleteTask($request->validated('id'));
+
+        return response()->json([
+            'message' => 'Task deleted successfully'
+        ]);
     }
 
 }

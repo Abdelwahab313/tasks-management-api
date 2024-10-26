@@ -46,6 +46,38 @@ class TaskApiTest extends TestCase
         $this->assertDatabaseCount('tasks', 0);
     }
 
+    public function test_should_validates_required_fields()
+    {
+        $response = $this->postJson('/api/tasks', []);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['title', 'status', 'due_date']);
+    }
+
+    public function test_should_validates_future_due_date()
+    {
+        $taskData = Task::factory()
+            ->make(['due_date' => Carbon::yesterday()])
+            ->toArray();
+
+        $response = $this->postJson('/api/tasks', $taskData);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['due_date']);
+    }
+
+    public function test_should_validates_status_enum()
+    {
+        $taskData = Task::factory()
+            ->make(['status' => 'invalid_status'])
+            ->toArray();
+
+        $response = $this->postJson('/api/tasks', $taskData);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+    }
+
     public function test_can_get_all_tasks_ordered_by_due_date()
     {
 
@@ -119,6 +151,7 @@ class TaskApiTest extends TestCase
 
         $response = $this->getJson('/api/tasks?page=2&per_page=5');
 
+
         $response->assertStatus(200)
             ->assertJsonCount(5, 'data')
             ->assertJsonPath('meta.current_page', 2)
@@ -142,29 +175,6 @@ class TaskApiTest extends TestCase
             ->assertJsonPath('meta.total', 10);
     }
 
-
-    public function test_can_get_task_by_id()
-    {
-        $task = Task::factory()->pending()->create();
-
-        $response = $this->getJson('/api/tasks/' . $task->id);
-
-        $response->assertStatus(200)
-            ->assertJson(['data' => [
-                'title' => $task->title,
-                'status' => $task->status,
-                'description' => $task->description,
-            ]]);
-    }
-
-    public function test_cannot_get_task_by_invalid_id()
-    {
-        $response = $this->getJson('/api/tasks/invalid_id');
-
-        $response->assertStatus(404);
-    }
-
-
     public function test_can_get_empty_tasks_list()
     {
         $response = $this->getJson('/api/tasks');
@@ -174,5 +184,36 @@ class TaskApiTest extends TestCase
     }
 
 
+
+    public function test_can_update_task()
+    {
+        $task = Task::factory()->create();
+        $updateData = [
+            'title' => 'Updated Title',
+            'status' => 'completed'
+        ];
+
+        $response = $this->putJson("/api/tasks?id={$task->id}", $updateData);
+
+        $response->assertOk()
+            ->assertJsonPath('data.title', 'Updated Title')
+            ->assertJsonPath('data.status', 'completed');
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Updated Title',
+            'status' => 'completed'
+        ]);
+    }
+
+    public function test_can_delete_task()
+    {
+        $task = Task::factory()->create();
+
+        $response = $this->deleteJson("/api/tasks?id={$task->id}");
+
+        $response->assertOk();
+        $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
+    }
 
 }

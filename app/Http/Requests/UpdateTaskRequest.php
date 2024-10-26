@@ -7,7 +7,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class ShowTaskRequest extends FormRequest
+class UpdateTaskRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -17,23 +17,21 @@ class ShowTaskRequest extends FormRequest
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array|string>
-     */
     public function rules(): array
     {
         return [
-            'id' => ['required', 'integer'],
+            'id' => 'required|exists:tasks,id',
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string',
+            'status' => ['sometimes', Rule::in(Task::getStatuses())],
+            'due_date' => 'sometimes|date|after:today',
         ];
     }
 
     protected function prepareForValidation(): void
     {
-     // check parameter passed as route or query string
         $this->merge([
-            'id' =>  request()->route('task') ?? request()->query('id'),
+            'id' => $this->query('id')
         ]);
     }
 }
