@@ -28,6 +28,7 @@ class ListTasksRequest extends FormRequest
             'status' => ['sometimes', Rule::in(Task::getStatuses())],
             'due_date' => 'sometimes|date',
             'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
             'title' => 'sometimes|string|max:255'
         ];
     }

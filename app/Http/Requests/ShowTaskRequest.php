@@ -25,7 +25,7 @@ class ShowTaskRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id' => ['required',  Rule::exists(Task::class, 'id')],
+            'id' => ['required'],
         ];
     }
 

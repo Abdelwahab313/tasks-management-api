@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Task;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,14 +21,14 @@ class TaskApiTest extends TestCase
             ->assertJson(['data' => [
                 'title' => $taskData['title'],
                 'status' => $taskData['status'],
-                'due_date' => $taskData['due_date'],
+                'due_date' => Carbon::parse($taskData['due_date'])->format('Y-m-d'),
             ]]);
 
         // Assert data was actually saved in a database
         $this->assertDatabaseHas('tasks', [
             'title' => $taskData['title'],
             'status' => $taskData['status'],
-            'due_date' => $taskData['due_date'],
+            'due_date' =>  Carbon::parse($taskData['due_date'])->format('Y-m-d'),
         ]);
     }
 
@@ -54,20 +55,10 @@ class TaskApiTest extends TestCase
 
         $response = $this->getJson('/api/tasks');
         $response->assertStatus(200)
-            ->assertJsonCount(3, 'data.data')
-            ->assertJsonPath('data.data.0.id', $pastDueTask->id)
-            ->assertJsonPath('data.data.1.id', $todayTask->id)
-            ->assertJsonPath('data.data.2.id', $tomorrowDueTask->id);
-
-//
-//        // Test filtering by due_date
-//        $response = $this->getJson('/api/tasks?due_date=' . now()->addDays(1)->format('Y-m-d'));
-//        $response->assertStatus(200)
-//            ->assertJsonCount(1, 'data.data')
-//            ->assertJsonPath('data.data.0.id', $pendingTask->id);
-//
-//        // Verify database state after test
-//        $this->assertDatabaseCount('tasks', 2);
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.id', $pastDueTask->id)
+            ->assertJsonPath('data.1.id', $todayTask->id)
+            ->assertJsonPath('data.2.id', $tomorrowDueTask->id);
     }
 
     public function test_can_filter_tasks_by_status()
@@ -79,8 +70,8 @@ class TaskApiTest extends TestCase
         $response = $this->getJson('/api/tasks?status=completed');
 
         $response->assertStatus(200)
-            ->assertJsonCount(1, 'data.data')
-            ->assertJsonPath('data.data.0.status', Task::STATUS_COMPLETED);
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', Task::STATUS_COMPLETED);
     }
 
     public function test_can_filter_tasks_by_status_with_invalid_status()
@@ -104,8 +95,8 @@ class TaskApiTest extends TestCase
         $response = $this->getJson('/api/tasks?title=Task');
 
         $response->assertStatus(200)
-            ->assertJsonCount(2, 'data.data')
-            ->assertJsonPath('data.data.0.title', 'Task 1');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.title', 'Task 1');
     }
 
     public function test_can_filter_by_due_date()
@@ -116,9 +107,41 @@ class TaskApiTest extends TestCase
 
             $response = $this->getJson('/api/tasks?due_date=' . now()->format('Y-m-d'));
             $response->assertStatus(200)
-                ->assertJsonCount(1, 'data.data')
-                ->assertJsonPath('data.data.0.id', $task1->id);
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.id', $task1->id);
     }
+
+
+
+    public function test_should_get_tasks_with_pagination()
+    {
+        $tasks = Task::factory()->count(10)->create();
+
+        $response = $this->getJson('/api/tasks?page=2&per_page=5');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('meta.current_page', 2)
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.per_page', 5)
+            ->assertJsonPath('meta.total', 10);
+    }
+
+    public function test_should_get_tasks_with_pagination_and_filter()
+    {
+        $tasks = Task::factory()->completed()->count(10)->create();
+        $filteredOutTasks = Task::factory()->pending()->count(2)->create();
+
+        $response = $this->getJson('/api/tasks?page=2&per_page=5&status=' . Task::STATUS_COMPLETED);
+
+        $response->assertStatus(200)
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('meta.current_page', 2)
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.per_page', 5)
+            ->assertJsonPath('meta.total', 10);
+    }
+
 
     public function test_can_get_task_by_id()
     {
@@ -147,8 +170,9 @@ class TaskApiTest extends TestCase
         $response = $this->getJson('/api/tasks');
 
         $response->assertStatus(200)
-            ->assertJsonCount(0, 'data.data');
+            ->assertJsonCount(0, 'data');
     }
+
 
 
 }
