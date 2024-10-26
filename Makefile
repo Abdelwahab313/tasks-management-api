@@ -64,9 +64,9 @@ endif
 
 test:
 ifeq ($(IS_RUNNING), $(RUNNING))
-	docker compose exec app php artisan test --parallel $(filter-out $@,$(MAKECMDGOALS))
+	docker compose exec app php artisan test  $(filter-out $@,$(MAKECMDGOALS))
 else
-	docker compose run --rm app php artisan test --parallel $(filter-out $@,$(MAKECMDGOALS))
+	docker compose run --rm app php artisan test  $(filter-out $@,$(MAKECMDGOALS))
 endif
 
 # Development helpers
